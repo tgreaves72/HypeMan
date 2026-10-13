@@ -344,7 +344,7 @@ export function ConversationWorkbench({ runtime, initialTool, onClose, onActivit
       if (!recovery) await append("user", text);
       if (recovery?.runtimeAttempt && runtime?.retry) { await runtime.retry(); if (runtime.getSnapshot().phase === "error") throw new Error(runtime.getSnapshot().messages.at(-1)?.text || "Request failed."); return; }
       if (recovery && !runtime && conversationCheckpoint.current) { await runConversation(text, controller.signal, true, attachment); return; }
-      const dismiss = text.match(/^(?:close|dismiss|hide)(?: this| the)?(?: (tool|board|whiteboard|documents?|pdf|notes|video|projects|settings|preferences|practice|phone|connection))?$/i);
+      const dismiss = text.match(/^(?:close|dismiss|hide)(?: this| the)?(?: (tool|board|whiteboard|documents?|pdf|notes|library|study library|review|flashcards|video|projects|settings|preferences|practice|phone|connection))?$/i);
       if (dismiss) {
         const names: Record<string, OverlaySection> = { board: "board", whiteboard: "board", document: "documents", documents: "documents", pdf: "documents", notes: "notes", video: "video", projects: "tasks", settings: "settings", preferences: "settings", practice: "learning", phone: "phone", connection: "connection" };
         const section = names[dismiss[1]?.toLowerCase()] || state.current.tool;
@@ -353,7 +353,7 @@ export function ConversationWorkbench({ runtime, initialTool, onClose, onActivit
       }
       if (/^(?:new (?:chat|conversation)|start over)$/i.test(text)) { await switchConversation(crypto.randomUUID()); return; }
       if (/^(?:show|open|find|list)(?: my| the)? (?:saved work|conversations|chats)(?: about .+)?$/i.test(text)) { const all = await request<Array<{ id: string; title: string; messages: Message[] }>>({ type: "conversation.list" }); const query = text.split(/ about /i)[1]; const hits = query ? await request<Array<{ id: string; conversationId?: string }>>({ type: "recall.search", query, kinds: ["conversation"], limit: 30 }) : null; setSaved(all.filter((c) => !hits || hits.some((hit) => (hit.conversationId || hit.id) === c.id)).sort((a,b) => (b.messages.at(-1)?.at || 0) - (a.messages.at(-1)?.at || 0))); await append("assistant", "Select a conversation to continue its saved work."); return; }
-      if (/^(?:help|what can you do)[?!]?$/i.test(text)) { await append("assistant", "Ask me a question, drop a PDF, or select something on the page. I can draw explanations, save notes, manage projects, help with videos and practice, and manage settings or your phone."); return; }
+      if (/^(?:help|what can you do)[?!]?$/i.test(text)) { await append("assistant", "Ask me a question, drop a PDF, or select something on the page. I can draw explanations, save notes, manage projects, help with videos and practice, and manage settings or your phone. Say ‘open library’ to search saved notes and conversations, or ‘review cards’ for spaced practice. The library and reviews work offline."); return; }
       if (/^(?:capture|screenshot|attach)(?: a| the)? (?:screen region|region of (?:the|my) screen|part of (?:the|my) screen)$/i.test(text)) {
         if (!runtime) throw new Error("Open the conversation on the webpage you want to capture, then ask to capture a screen region.");
         if (!settings.screenshotEnabled) { await executeTool("settings", "permissions", { permission: "capture" }); await append("assistant", "Allow screenshot access, then ask to capture the screen region again."); return; }

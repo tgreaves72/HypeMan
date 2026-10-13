@@ -4,6 +4,13 @@ import { phoneMessageText, phoneReview } from "../apps/extension/src/ui/phone-re
 import { documentBatches, documentQuestionPages, pageList } from "../apps/extension/src/ui/document-analysis";
 
 describe("shortcuts preserve complete requests", () => {
+  it("opens the library and review queue locally while preserving compound requests", () => {
+    expect(toolIntent("open study library", null, null)).toMatchObject({ tool: "notes", operation: "open" });
+    expect(toolIntent("review my cards", null, null)).toMatchObject({ tool: "notes", operation: "review" });
+    expect(toolIntent("show flashcards", null, null)).toMatchObject({ tool: "notes", operation: "review" });
+    expect(toolIntent("find my notes about revisions", null, null)).toMatchObject({ tool: "notes", operation: "find", args: { query: "revisions", kind: "note" } });
+    expect(toolIntent("review cards then explain my mistakes", null, null)).toBeNull();
+  });
   it.each(["Save this and text it to me", "Remember this, then draw an explanation", "Make a study plan and save it", "Summarize this video https://youtu.be/aB3dE5gH7_j and create a note"])("leaves %s to the planner", (request) => expect(toolIntent(request, null, null)).toBeNull());
   it("keeps literal saved content and exact single tool actions simple", () => {
     expect(toolIntent("Save salt and pepper", null, null)).toMatchObject({ tool: "notes", operation: "save", args: { text: "salt and pepper" } });

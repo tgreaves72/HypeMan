@@ -2,6 +2,7 @@ import { parseWorkspace, type CompanionSnapshot } from "./workspace";
 import { parseLearningGraph, type LearningGraph } from "./learning";
 import { MAX_DOCUMENT_BYTES, type DocumentMetadata } from "./documents";
 import { parseBoardDocument } from "./board";
+import { parseStudy, type StudyState } from "./study";
 
 export const BACKUP_CHUNK_BYTES = 256 * 1024;
 export const MAX_BACKUP_BYTES = 128 * 1024 * 1024;
@@ -11,8 +12,9 @@ export interface WorkspaceBackup {
   format: "hypeman-backup"; version: 1; exportedAt: number;
   workspace: CompanionSnapshot; workbench: { version: 1; conversations: BackupConversation[]; artifacts: BackupArtifact[] };
   learning: LearningGraph; documents: { metadata: DocumentMetadata; sha256: string; data: string }[];
+  study?: StudyState;
 }
-export interface BackupManifest { format: "hypeman-backup"; version: 1; exportedAt: number; counts: { notes: number; tasks: number; conversations: number; artifacts: number; documents: number; plans: number }; includesOriginalPdfs: true; includesCredentials: false; missingOriginalPdfs: string[] }
+export interface BackupManifest { format: "hypeman-backup"; version: 1; exportedAt: number; counts: { notes: number; tasks: number; conversations: number; artifacts: number; documents: number; plans: number; cards?: number }; includesOriginalPdfs: true; includesCredentials: false; missingOriginalPdfs: string[] }
 export interface BackupTransfer { transferId: string; size: number; chunkBytes: number; manifest: BackupManifest }
 export interface BackupRestoreResult { restored: BackupManifest["counts"]; skipped: number }
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
@@ -33,8 +35,8 @@ function canonical(value: unknown): string {
 }
 export function backupManifest(backup: WorkspaceBackup): BackupManifest {
   const originals = new Set(backup.documents.map(document => document.metadata.id));
-  return { format: backup.format, version: 1, exportedAt: backup.exportedAt, counts: { notes: backup.workspace.notes.length, tasks: backup.workspace.tasks.length, conversations: backup.workbench.conversations.length, artifacts: backup.workbench.artifacts.length, documents: backup.documents.length, plans: backup.learning.plans.length }, includesOriginalPdfs: true, includesCredentials: false,
-    missingOriginalPdfs: [...new Set(backup.workspace.notes.flatMap(note => note.origin?.documentId && !originals.has(note.origin.documentId) ? [note.origin.documentId] : []))] };
+  return { format: backup.format, version: 1, exportedAt: backup.exportedAt, counts: { notes: backup.workspace.notes.length, tasks: backup.workspace.tasks.length, conversations: backup.workbench.conversations.length, artifacts: backup.workbench.artifacts.length, documents: backup.documents.length, plans: backup.learning.plans.length, ...(backup.study ? { cards: backup.study.cards.length } : {}) }, includesOriginalPdfs: true, includesCredentials: false,
+    missingOriginalPdfs: [...new Set([...backup.workspace.notes.flatMap(note => note.origin?.documentId && !originals.has(note.origin.documentId) ? [note.origin.documentId] : []), ...(backup.study?.cards.flatMap(card => card.source.documentId && !originals.has(card.source.documentId) ? [card.source.documentId] : []) || [])])] };
 }
 /** Reject malformed/partial archives before any store changes. Credentials and provider state are never imported. */
 export function parseWorkspaceBackup(value: unknown): WorkspaceBackup {
@@ -75,5 +77,7 @@ export function parseWorkspaceBackup(value: unknown): WorkspaceBackup {
     documents.push({ metadata: meta as unknown as DocumentMetadata, sha256: raw.sha256, data: raw.data });
   }
   if (workspace.notes.some(note => note.origin && !conversationIds.has(note.origin.conversationId))) return fail();
-  return { format: "hypeman-backup", version: 1, exportedAt: value.exportedAt, workspace, workbench: { version: 1, conversations, artifacts }, learning, documents };
+  let study: StudyState | undefined;
+  try { if (value.study !== undefined) study = parseStudy(value.study); } catch { return fail(); }
+  return { format: "hypeman-backup", version: 1, exportedAt: value.exportedAt, workspace, workbench: { version: 1, conversations, artifacts }, learning, documents, ...(study ? { study } : {}) };
 }

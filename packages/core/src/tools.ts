@@ -1,7 +1,7 @@
 export const TOOL_OPERATIONS = {
   board: ["open", "add", "update", "undo", "redo", "clear", "color", "width", "mode", "erase", "check", "export"],
   documents: ["open", "show", "analyze", "summarize", "page", "remove", "explain", "inspect", "read", "cancel", "export", "download"],
-  notes: ["open", "find", "save", "delete", "undo", "export"],
+  notes: ["open", "find", "save", "delete", "undo", "export", "review"],
   projects: ["open", "filter", "pause", "resume", "cancel", "done"],
   activity: ["open"],
   settings: ["open", "set", "pause-site", "resume-site", "permissions"],

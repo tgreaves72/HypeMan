@@ -11,6 +11,7 @@ npm run e2e:install
 npm run e2e
 npm run e2e:ui
 npm run e2e:workbench
+npm run e2e:study
 npm run e2e:pdf
 npm run e2e:projects
 npm run e2e:execution
@@ -21,6 +22,8 @@ npm run store:assets
 ```
 
 Browser checks use isolated Chromium profiles, minimal test-only pages, and controlled provider responses. They verify browser policy, persistence, tool interactions, transport, and failure recovery. Mocked authentication does not sign in to an actual account or consume plan usage.
+
+The study checks run with browser networking disabled and use saved notes and conversation messages rather than provider fixtures. They exercise source search, topic assignment, card creation, answer reveal, text contrast, keyboard focus/tab navigation, persisted review dates, reload, pause/resume, editing/deletion, repeated chat shortcuts, a 360px viewport, and a maximized 1920px workspace. Core and background tests cover scheduling, stale revisions, concurrent ratings, idempotent retries, storage failure recovery, and backup validation/restore. Set `HYPEMAN_TEST_CHROMIUM` to an installed Chromium executable if the machine uses a different Playwright browser revision.
 
 Store preparation also loads the staged package without the development manifest key and verifies local tools without a gateway, privacy defaults, and listing-image dimensions. Store-ID tests check the exact configured origin and continued API authentication. Atomic-file tests cover Windows lock retries, preservation of the previous state, and bounded failure. POSIX permission-bit and privileged file-symlink assertions run on supported platforms; Windows uses filesystem ACLs, which those POSIX assertions do not validate.
 

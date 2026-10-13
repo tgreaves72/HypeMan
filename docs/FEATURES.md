@@ -43,8 +43,11 @@ Progress is conservative: a click or an agent’s final reply cannot complete a 
 | Whiteboard | Shared persisted strokes, shapes, text, editable KaTeX equations, assistant transactions, keyboard undo/redo, direct manipulation, composite PNG export and review | Local editing and export; assistant additions and review require ChatGPT |
 | PDFs | PDF.js preview, incremental text, 25 MiB chunked upload into extension IndexedDB, local passwords, highlighted passages, page citations, explicit scanned-page analysis and original-file export | Local viewing, selection, and original-file export; analysis requires ChatGPT |
 | Learning | Optional plans, hints, page-feedback evidence, teach-back review, concept graph                     | Saved practice history; new plans and feedback require ChatGPT        |
+| Study library | Local search across notes and actual conversation messages; course labels, PDF/web/chat source links, editable review cards, due queues, answer reveal, four ratings, pause/resume/delete, and backup restore | All library and spaced-review functions work without a gateway or internet connection |
 
 Task notes and learner diagnostics are separate. Teach-back records an explanation; assessed evidence is accepted only when grounded in that explanation. Mocked assessment in automated tests does not establish mastery. The graph presents practice history, not a grade.
+
+Spaced reviews record explicit self-ratings with a simple graduated schedule, separate from the learner graph. Cards preserve source metadata and an editable saved answer; they do not update automatically when the source changes. Cross-window revision checks reject stale edits and ratings, and retry identities prevent duplicate reviews. Workspace backups include cards, course labels, schedules, and recent review history; existing identities win during restore.
 
 ## Scope and limits
 

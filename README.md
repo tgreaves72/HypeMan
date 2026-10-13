@@ -21,11 +21,19 @@ HypeMan lives on ordinary webpages. Activate the avatar, describe what you need,
 | Do the work | Keep the context |
 | --- | --- |
 | **Browser tasks.** Compare pages, navigate, prepare ordinary forms, and review detected consequential actions before execution. | **Projects.** Multi-step goals become saved milestones, with source evidence, explicit continuation after restart, and handoff between tabs. |
-| **Shared whiteboard.** Draw together, edit equations, move objects, undo changes, and export a combined PNG. | **Source-linked notes.** Save passages, edit directly, find earlier work, and export your workspace. |
+| **Shared whiteboard.** Draw together, edit equations, move objects, undo changes, and export a combined PNG. | **Study library.** Search saved notes and conversations locally, organize sources by course, and build source-linked review cards. |
 | **PDF and video help.** Read local PDFs with page citations; turn captions into chapters and timestamped notes. | **Optional learning.** Ask for graduated hints, explain an answer back, and inspect practice history. |
 | **Phone companion.** Send Chrome requests from your paired phone through Photon Spectrum. | **Follow-through.** Capture ideas, text saved work, and receive reminders and scheduled check-ins. |
 
 Projects advance when HypeMan can verify the visible outcome or you explicitly confirm the step. Passwords, payment fields, and verification codes stay in your hands.
+
+## Keep useful work and practice recalling it
+
+Say **open library** in HypeMan chat. Search saved notes and conversations, filter by source type or course, and edit notes directly. Search uses local text matching and curated concept aliases; it shows actual saved content and makes no AI request. Use **Make review card** on a source, write a focused question, check its answer, and save it. Cards retain the original webpage link or conversation/PDF citation.
+
+Say **review cards** or choose **Review** in the library. Start a session of 5, 10, or 20 due cards, recall each answer before revealing it, then choose **Again**, **Hard**, **Good**, or **Easy**. Each button previews its next interval. Again returns the card in 10 minutes; first successful ratings schedule 1, 1, or 4 days respectively. Later successful reviews grow the interval, capped at 365 days. This simple graduated schedule records self-rated practice, independently of assessed learning evidence.
+
+The library and review queue work without the gateway, sign-in, or an internet connection. Review dates, course labels, source metadata, and recent ratings persist across reloads and travel with workspace backups. Pause, edit, resume, or delete individual cards. One background writer serializes changes, rejects stale edits across windows, and deduplicates review retries. Restore merges saved identities without overwriting existing schedules. The library supports up to 1,000 cards and retains the latest 2,000 ratings, subject to available browser storage.
 
 ## New-tab rooftop controls
 
@@ -67,7 +75,7 @@ npm start
 
 Live AI uses your eligible ChatGPT plan through the local gateway. No OpenAI API key or pairing key is needed. Use your regular Chrome profile for actual sign-in; automated checks use isolated browser profiles.
 
-Local whiteboard editing, PDF viewing, notes, and saved work are available without live AI.
+Local whiteboard editing, PDF viewing, notes, library search, spaced reviews, and saved work are available without live AI.
 
 After rebuilding, reload the extension and refresh webpage tabs. `npm run dev` watches the gateway and extension build. See [detailed setup](docs/SETUP.md) for connection recovery, phone pairing, environment settings, controls, and troubleshooting.
 
@@ -95,6 +103,7 @@ npm run check:docs     # Documentation links and public asset checks
 npm run e2e:install    # Install the isolated Playwright browser
 npm run e2e            # Main extension/browser suite
 npm run e2e:ui         # Rooftop and specialist UI
+npm run e2e:study      # Offline search, review persistence, and responsive library
 npm run e2e:pdf        # Local PDF reading, storage, and export
 npm run e2e:projects   # Saved milestones and continuation
 npm run e2e:execution  # Browser execution and confirmation

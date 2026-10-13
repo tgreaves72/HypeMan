@@ -27,6 +27,7 @@ import { workbenchMessage, type Conversation } from "./workbench";
 import { handleDocumentMessage, documentRepository } from "./documents";
 import { BackupService } from "./backup";
 import { recallSearch } from "./recall";
+import { StudyService } from "./study";
 import { LearningPracticeService } from "./learning-practice";
 import { handleFrameGrantMessage } from "./frame-grants";
 import { ConversationAssistance } from "./conversation-assistance";
@@ -53,7 +54,8 @@ const workspace = new WorkspaceHost({
   },
 });
 const gateway = new GatewayClient(settings, globalThis.fetch.bind(globalThis), saveConnection);
-const backup = new BackupService({ workspace: () => workspace.snapshot(), restoreWorkspace: value => workspace.restore(value), workbench: workbenchMessage, learning: graph, restoreLearning: mergeLearning, documents: documentRepository });
+const study = new StudyService({ load: async () => (await chrome.storage.local.get("hypeman.study"))["hypeman.study"], save: async value => { await chrome.storage.local.set({ "hypeman.study": value }); }, notes: async () => (await workspace.snapshot()).notes, conversations: () => workbenchMessage({ type: "conversation.list" }) as Promise<Conversation[]> });
+const backup = new BackupService({ workspace: () => workspace.snapshot(), restoreWorkspace: value => workspace.restore(value), workbench: workbenchMessage, learning: graph, restoreLearning: mergeLearning, documents: documentRepository, study: () => study.snapshot(), restoreStudy: value => study.merge(value), preflightStudy: value => study.preflightMerge(value) });
 const practice = new LearningPracticeService({ graph, enabled: async () => (await settings()).learningEnabled, save: savePracticeAttempt });
 const phone = new PhoneSync(
   chrome.storage.local,
@@ -487,6 +489,10 @@ async function handle(
   const tabId = sender.tab?.id ?? null;
   const config = await settings();
   if (typeof type !== "string") throw new Error("Invalid request");
+  if (type.startsWith("study.") || type === "library.search") {
+    if (sender.id !== chrome.runtime.id) throw new Error("Unknown study caller.");
+    return type === "library.search" ? study.search(message) : study.handle(message);
+  }
   if (type.startsWith("backup.")) {
     if (sender.id !== chrome.runtime.id) throw new Error("Unknown backup caller.");
     return backup.handle(message, `${sender.id}:${sender.tab?.id ?? "extension"}:${sender.frameId ?? 0}:${sender.documentId ?? sender.url ?? ""}`);

@@ -115,6 +115,8 @@
 .newtab-web-search input:focus { outline:none; box-shadow:none; }
 .newtab-avatar-icon { position:fixed; inset:auto 20px 18px auto; z-index:3; width:96px; height:87px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
 .skin-picker { position:fixed; right:12px; top:12px; z-index:60; font:16px/1.2 Tiny5,monospace; color:#102638; }
+/* Workspace controls stay reachable when a window covers the rooftop. */
+.conversational-desktop .skin-picker { z-index:35; }
 .skin-picker-trigger, .skin-picker-panel { border:3px solid #102638; border-radius:0; background:#f1f5f5; box-shadow:inset 2px 2px #fff,inset -2px -2px #899baa,4px 4px #061421; }
 .skin-picker-trigger { padding:4px 8px; color:inherit; font:inherit; cursor:pointer; }
 .skin-picker-panel { position:absolute; right:0; top:36px; width:min(216px,calc(100vw - 24px)); max-height:calc(100dvh - 80px); overflow:auto; padding:8px; box-sizing:border-box; }

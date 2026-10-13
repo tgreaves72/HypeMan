@@ -1,10 +1,12 @@
 # HypeMan privacy policy
 
-Last updated: October 11, 2026.
+Last updated: October 12, 2026.
 
 This policy describes the HypeMan browser extension and its optional, locally running Node gateway. The publisher does not operate a hosted HypeMan AI service in this release. AI and phone features require a gateway on your own computer and the external accounts you choose to connect.
 
 ## Information HypeMan handles
+
+The study library stores course/topic labels, review questions and answers, source metadata, next-review dates, and self-ratings locally in extension storage. Its search and review sessions do not send content to an AI service or require a gateway. Optional typed recall during a review stays in the current window and is discarded when you leave the session. Workspace backups include saved cards, schedules, labels, and the latest 2,000 ratings. Deleting a card leaves its source and retained review history intact; removing the extension/profile clears this local data.
 
 When you use the companion, HypeMan can read the current webpage's URL, title, visible text, selected text, and ordinary interactive elements to answer your request and perform browser tasks. It records requested actions and their outcomes. Browser-wide history is not imported. Context from other tabs, screenshots, and real browser input are separate settings that start disabled. Automatic contextual help starts disabled for new installations; you can enable it in Settings. Existing installations retain their saved choice. Pause HypeMan on individual sites to stop observation and page actions there.
 

@@ -38,6 +38,8 @@ jobs:
         run: npm run e2e
       - name: Conversation workbench browser checks
         run: npm run e2e:workbench
+      - name: Offline study library and review checks
+        run: npm run e2e:study
       - name: Rooftop and specialist UI browser checks
         run: npm run e2e:ui
       - name: Focused browser regressions

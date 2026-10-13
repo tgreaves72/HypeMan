@@ -23,6 +23,7 @@
     "e2e:auth": "node tests/chatgpt-browser.mjs",
     "e2e:ui": "node tests/newtab-browser.mjs",
     "e2e:workbench": "node tests/workbench-browser.mjs",
+    "e2e:study": "node tests/study-browser.mjs",
     "e2e:hints": "node tests/automatic-hints-browser.mjs",
     "e2e:projects": "node tests/projects-browser.mjs",
     "e2e:messaging": "node tests/messaging-browser.mjs",

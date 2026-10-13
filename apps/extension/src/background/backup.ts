@@ -1,5 +1,5 @@
 import { BACKUP_CHUNK_BYTES, MAX_BACKUP_BYTES, backupManifest, parseWorkspaceBackup,
-  type BackupRestoreResult, type CompanionSnapshot, type LearningGraph, type WorkspaceBackup } from "@core";
+  type BackupRestoreResult, type CompanionSnapshot, type LearningGraph, type WorkspaceBackup, type StudyState } from "@core";
 import type { DocumentRepository, StoredDocument } from "./documents";
 
 interface Dependencies {
@@ -9,6 +9,9 @@ interface Dependencies {
   learning(): Promise<LearningGraph>;
   restoreLearning(value: LearningGraph): Promise<number>;
   documents: DocumentRepository;
+  study?(): Promise<StudyState>;
+  restoreStudy?(value: StudyState): Promise<number>;
+  preflightStudy?(value: StudyState): Promise<void>;
   now?: () => number;
 }
 type Transfer = { owner: string; at: number } & ({ kind: "export"; blob: Blob } | { kind: "restore"; size: number; received: number; chunks: Uint8Array[] });
@@ -41,17 +44,17 @@ export class BackupService {
     };
     if (message.type === "backup.export") {
       if (this.transfers.size >= 4) throw new Error("Finish or cancel the current backup transfer first.");
-      const [workspace, workbench, learning, documents] = await Promise.all([api.workspace(), api.workbench({ type: "workbench.export" }), api.learning(), api.documents.all!()]);
+      const [workspace, workbench, learning, documents, study] = await Promise.all([api.workspace(), api.workbench({ type: "workbench.export" }), api.learning(), api.documents.all!(), api.study?.()]);
       const saved = workbench as WorkspaceBackup["workbench"];
       const conversations = [...saved.conversations], ids = new Set(conversations.map(item => item.id));
-      const referenceIds = [...documents.map(item => item.conversationId), ...saved.artifacts.map(item => item.conversationId), ...workspace.notes.flatMap(note => note.origin ? [note.origin.conversationId] : []), ...workspace.tasks.flatMap(task => task.conversationId ? [task.conversationId] : [])];
+      const referenceIds = [...documents.map(item => item.conversationId), ...saved.artifacts.map(item => item.conversationId), ...workspace.notes.flatMap(note => note.origin ? [note.origin.conversationId] : []), ...workspace.tasks.flatMap(task => task.conversationId ? [task.conversationId] : []), ...(study?.cards.flatMap(card => card.source.conversationId ? [card.source.conversationId] : []) || [])];
       for (const id of referenceIds) if (!ids.has(id)) { conversations.push({ id, title: "Saved work", updatedAt: now, messages: [] }); ids.add(id); }
       const originals: WorkspaceBackup["documents"] = [];
       for (const document of documents) {
         const { blob, ...metadata } = document, bytes = new Uint8Array(await blob.arrayBuffer());
         originals.push({ metadata, sha256: await digest(bytes), data: base64(bytes) });
       }
-      const backup: WorkspaceBackup = { format: "hypeman-backup", version: 1, exportedAt: now, workspace, workbench: { version: 1, conversations, artifacts: saved.artifacts }, learning, documents: originals };
+      const backup: WorkspaceBackup = { format: "hypeman-backup", version: 1, exportedAt: now, workspace, workbench: { version: 1, conversations, artifacts: saved.artifacts }, learning, documents: originals, ...(study ? { study } : {}) };
       parseWorkspaceBackup(backup);
       const blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
       if (blob.size > MAX_BACKUP_BYTES) throw new Error("This backup exceeds 128 MiB. Export large PDF originals separately before retrying.");
@@ -94,12 +97,17 @@ export class BackupService {
       documents.push({ ...original.metadata, blob: new Blob([bytes as Uint8Array<ArrayBuffer>], { type: "application/pdf" }) });
     }
     const [existing, learning] = await Promise.all([api.workspace(), api.learning()]);
+    if (backup.study) {
+      if (!api.restoreStudy || !api.preflightStudy) throw new Error("Update HypeMan before restoring this study library.");
+      await api.preflightStudy(backup.study);
+    }
     if (existing.notes.length + backup.workspace.notes.filter(note => !existing.notes.some(item => item.id === note.id)).length > 500 || existing.tasks.length + backup.workspace.tasks.filter(task => !existing.tasks.some(item => item.id === task.id)).length > 100 || existing.events.length + backup.workspace.events.filter(event => !existing.events.some(item => item.id === event.id)).length > 1000 || learning.plans.length + backup.learning.plans.filter(plan => !learning.plans.some(item => item.id === plan.id)).length > 40 || learning.nodes.length + backup.learning.nodes.filter(node => !learning.nodes.some(item => item.id === node.id)).length > 1000) throw new Error("Restore exceeds local saved-work limits. Existing work was preserved.");
     // Merge-only writes never overwrite existing IDs. If a store fails, retry safely resumes deduplicated imports.
     try {
       const workbench = await api.workbench({ type: "workbench.restore", value: backup.workbench }) as { conversations: number; artifacts: number };
       const documentCount = await api.documents.merge!(documents), workspace = await api.restoreWorkspace(backup.workspace), plans = await api.restoreLearning(backup.learning);
-      const restored = { notes: workspace.notes, tasks: workspace.tasks, conversations: workbench.conversations, artifacts: workbench.artifacts, documents: documentCount, plans };
+      const cards = backup.study ? await api.restoreStudy!(backup.study) : undefined;
+      const restored = { notes: workspace.notes, tasks: workspace.tasks, conversations: workbench.conversations, artifacts: workbench.artifacts, documents: documentCount, plans, ...(cards === undefined ? {} : { cards }) };
       const result: BackupRestoreResult = { restored, skipped: Object.values(backupManifest(backup).counts).reduce((sum, count) => sum + count, 0) - Object.values(restored).reduce((sum, count) => sum + count, 0) };
       this.transfers.delete(String(message.transferId)); return result;
     } catch { throw new Error("Restore did not finish. Existing work is safe; retry this backup to resume without duplicates."); }

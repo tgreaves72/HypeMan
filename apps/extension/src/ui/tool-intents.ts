@@ -10,8 +10,10 @@ export function toolIntent(raw: string, active: string | null, selected: Selecte
   if (hasCompoundIntent(text)) return null;
   const action = (tool: CompanionTool, operation = "open", args: Record<string, unknown> = {}): ToolAction => ({ type: "tool", tool, operation, args });
   const open = lower.match(/^(?:(?:open|show|show me|list|let me see|go to|view)(?: my| the)? )?(.+)$/)?.[1];
+  if (open && ["library", "study library"].includes(open)) return action("notes");
+  if (open && ["review", "review cards", "review queue", "flashcards"].includes(open) || /^(?:review|study)(?: my| the)? (?:cards|flashcards)$/.test(lower)) return action("notes", "review");
   if (open && aliases[open]) return action(aliases[open], open === "phone inbox" ? "inbox" : "open");
-  if (/^(?:find|search)(?: my)? notes (?:about|for|on) /i.test(text)) return action("notes", "find", { query: text.replace(/^(?:find|search)(?: my)? notes (?:about|for|on) /i, "") });
+  if (/^(?:find|search)(?: my)? notes (?:about|for|on) /i.test(text)) return action("notes", "find", { kind: "note", query: text.replace(/^(?:find|search)(?: my)? notes (?:about|for|on) /i, "") });
   if (/^(?:save|remember|keep|pin) (?:this|that|it|this selection|that explanation)$/i.test(text)) return action("notes", "save", { ...selected });
   if (!/^(?:save)(?: this| my| the)? (?:board|whiteboard|drawing)(?: as png)?$/i.test(text) && /^(?:save|remember|keep)(?: this)?:? /i.test(text)) return action("notes", "save", { text: text.replace(/^(?:save|remember|keep)(?: this)?:? /i, "") });
   if (/^(?:delete|remove) (?:this |that |the selected )?note$/i.test(text)) return action("notes", "delete", { id: selected?.id });

@@ -27,8 +27,8 @@ export function clampWindow(rect: WindowRect, viewport: WindowViewport, minimum:
     y: bound(rect.y, viewport.y + inset, viewport.y + viewport.height - inset - height) };
 }
 export function initialWindow(tool: string, viewport: WindowViewport, chat?: { left: number; top?: number; width?: number; height?: number }, cascade = 0): WindowRect {
-  const preferredWidth = tool === "board" ? 860 : tool === "documents" ? 780 : tool === "video" ? 760 : 500;
-  const preferredHeight = tool === "documents" ? 700 : ["board", "phone"].includes(tool) ? 640 : tool === "video" ? 610 : 560;
+  const preferredWidth = tool === "board" ? 860 : tool === "documents" ? 780 : tool === "video" ? 760 : tool === "notes" ? 560 : 500;
+  const preferredHeight = ["documents", "notes"].includes(tool) ? 700 : ["board", "phone"].includes(tool) ? 640 : tool === "video" ? 610 : 560;
   const minimum = windowMinimum(tool), inset = margin(viewport), gap = 18, step = cascade % 5 * 22;
   const leftSpace = chat ? chat.left - viewport.x - inset - gap : 0;
   // On laptops, resize the new tool into the space beside chat before covering it.

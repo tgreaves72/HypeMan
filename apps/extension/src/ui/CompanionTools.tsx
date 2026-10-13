@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AVATAR_SKINS, currentLearningStep, emptyLearningGraph, learningEstimate, type AgentReply, type Health, type LearningGraph, type LearningPlan, type Settings, type SourceNote, type RecallHit } from "@core";
 import { request } from "../bridge";
-import { Empty, NoteCard, Notice, TaskCard, Toggle, ToolButton } from "./common";
+import { Empty, Notice, TaskCard, Toggle, ToolButton } from "./common";
 import { exportWorkspace, host, message, relativeTime, setScreenshotAccess, useSettings, useWorkspace } from "./hooks";
 import { useToolHandler, useWorkbench } from "./WorkbenchContext";
 import { ChatGPTConnection } from "./ChatGPTConnection";
@@ -9,6 +9,7 @@ import { Messaging } from "./Messaging";
 import type { IconName } from "./Icon";
 import { calculateTable, downloadTable } from "./table-export";
 import { restoreWorkspaceBackup } from "./workspace-backup";
+import { StudyLibrary } from "./StudyLibrary";
 export type CompanionSection = "tasks" | "notes" | "activity" | "settings" | "learning";
 export const companionSections: { section: CompanionSection; icon: IconName; label: string }[] = [
   { section: "tasks", icon: "task", label: "Projects" }, { section: "notes", icon: "notes", label: "Notes" },
@@ -21,7 +22,8 @@ export function CompanionTools({ section, onError, embedded = false }: { section
   const workbench = useWorkbench();
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const [recall, setRecall] = useState<RecallHit[]>([]);
+  const [libraryView, setLibraryView] = useState<"library" | "review">("library");
+  const [libraryKind, setLibraryKind] = useState<"all" | "note" | "conversation">("all"), [libraryRequest, setLibraryRequest] = useState(0);
   const [notice, setNotice] = useState("");
   const [creating, setCreating] = useState(false), [newText, setNewText] = useState("");
   const [permission, setPermission] = useState<"capture" | "input" | null>(null);
@@ -41,6 +43,12 @@ export function CompanionTools({ section, onError, embedded = false }: { section
     await refresh(); return operation === "resume" ? "Continuing the project." : operation === "pause" ? "Project paused." : "Project cancelled.";
   });
   useToolHandler(section === "notes" ? "notes" : null, async (operation, args) => {
+    if (["open", "find", "review"].includes(operation)) {
+      setLibraryRequest(value => value + 1);
+      setLibraryView(operation === "review" ? "review" : "library");
+      setLibraryKind(operation === "find" && (args.kind === "note" || args.kind === "conversation") ? args.kind : "all");
+    }
+    if (operation === "review") return "Review your saved cards. Reveal each answer and rate your own recall to schedule the next review.";
     if (operation === "find" && typeof args.id === "string") {
       const kind = args.kind === "conversation" ? "conversation" : "note";
       const source = await request<SourceNote | { id: string; title: string; messages: { id: string; role: string; text: string }[] } | null>({ type: "recall.get", kind, id: args.id });
@@ -55,8 +63,8 @@ export function CompanionTools({ section, onError, embedded = false }: { section
     }
     if (operation === "open" || operation === "find") {
       const query = String(args.query || args.text || "").trim(); setSearch(query);
-      if (!query) { setRecall([]); return "Your notes are ready."; }
-      const hits = await request<RecallHit[]>({ type: "recall.search", query, limit: 10 }); setRecall(hits);
+      if (!query) return "Your study library is ready. Browse sources or open Review for spaced practice.";
+      const hits = await request<RecallHit[]>({ type: "recall.search", query, limit: 10, ...(args.kind === "note" || args.kind === "conversation" ? { kinds: [args.kind] } : {}) });
       return { message: hits.length ? `${hits.length} saved sources found.` : "No saved source matched that request.", changed: false, data: { query, hits } };
     }
     if (operation === "export") {
@@ -75,12 +83,6 @@ export function CompanionTools({ section, onError, embedded = false }: { section
     }
     throw new Error("That note action is unavailable.");
   });
-  useEffect(() => {
-    if (section !== "notes" || !search.trim()) { setRecall((previous) => previous.length ? [] : previous); return; }
-    const controller = new AbortController();
-    const timer = setTimeout(() => void request<RecallHit[]>({ type: "recall.search", query: search.trim(), kinds: ["note"], limit: 100 }, controller.signal).then(setRecall).catch((cause) => { if (!controller.signal.aborted) fail(cause); }), 250);
-    return () => { clearTimeout(timer); controller.abort(); };
-  }, [section, search, workspace.notes]);
   useToolHandler(section === "activity" ? "activity" : null, async () => `${workspace.events.length} actions recorded. Select an action to inspect its source and evidence.`);
   useToolHandler(section === "settings" ? "settings" : null, async (operation, args) => {
     if (operation === "open") return "Edit a preference directly, or tell me what to change.";
@@ -110,7 +112,6 @@ export function CompanionTools({ section, onError, embedded = false }: { section
     throw new Error("That settings action is unavailable.");
   });
   const tasks = [...workspace.tasks].sort((a, b) => b.updatedAt - a.updatedAt).filter((task) => filter === "all" || filter === "unfinished" && ["running", "paused"].includes(task.status) || task.status === filter);
-  const notes = [...workspace.notes].sort((a, b) => b.updatedAt - a.updatedAt).filter((note) => !search || recall.some((hit) => hit.kind === "note" && hit.id === note.id) || `${note.text} ${note.excerpt} ${note.title} ${note.url}`.toLowerCase().includes(search.toLowerCase()));
   const outcomes = [...workspace.events].reverse();
   const grant = async () => {
     try {
@@ -131,8 +132,8 @@ export function CompanionTools({ section, onError, embedded = false }: { section
   return <section className={`inline-toolbox inline-toolbox-${section} ${embedded ? "embedded" : ""}`} aria-label={companionSections.find((item) => item.section === section)?.label}><div className="inline-tool-body">
     <Notice tone="error">{error || settingsError}</Notice><Notice>{notice}</Notice>{loading && <p role="status">Loading…</p>}
     {section === "tasks" && <><div className="tool-toolbar"><div className="tool-tabs" role="tablist" aria-label="Project status">{[["all", "All"], ["unfinished", "Active"], ["completed", "Done"]].map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={filter === value} onClick={() => setFilter(value!)}>{label}</button>)}</div><ToolButton icon="plus" label="New project" onClick={() => setCreating(!creating)} /></div><div className="inline-tool-list tool-content">{tasks.length ? tasks.map((task) => <TaskCard key={task.id} task={task} refresh={refresh} />) : <Empty title="No projects" />}</div></>}
-    {section === "notes" && <><div className="tool-toolbar"><input type="search" className="tool-search" aria-label="Find a note" placeholder="Find a note…" value={search} onChange={(event) => setSearch(event.target.value)} /><ToolButton icon="plus" label="New note" onClick={() => setCreating(!creating)} />{removed.current && <ToolButton icon="undo" label="Restore deleted note" onClick={() => void workbench.executeTool("notes", "undo").then(() => setNotice("")).catch(fail)} />}</div><div className="inline-tool-list tool-content">{notes.length ? notes.map((note) => <NoteCard key={note.id} note={note} refresh={refresh} onDelete={removeNote} />) : <Empty title={search ? "No matches" : "No notes yet"} />}</div></>}
     {creating && ["tasks", "notes"].includes(section) && <form className="tool-form" onSubmit={(event) => { event.preventDefault(); void create(); }}><textarea aria-label={section === "tasks" ? "Project goal" : "New note"} placeholder={section === "tasks" ? "Project goal…" : "New note…"} value={newText} onChange={(event) => setNewText(event.target.value)} autoFocus rows={2} /><div className="tool-actions"><button className="button primary" type="submit" disabled={!newText.trim()}>{section === "tasks" ? "Start" : "Save"}</button><button className="button" type="button" onClick={() => setCreating(false)}>Cancel</button></div></form>}
+    {section === "notes" && !creating && <StudyLibrary workspace={workspace} refresh={refresh} search={search} setSearch={setSearch} initialView={libraryView} initialKind={libraryKind} requestRevision={libraryRequest} onCreateNote={() => setCreating(true)} onDelete={removeNote} undo={removed.current ? () => void workbench.executeTool("notes", "undo").then(() => setNotice("")).catch(fail) : undefined} />}
     {section === "activity" && <div className="inline-action-list">{outcomes.length ? outcomes.map((event) => <article key={event.id} className="inline-action" tabIndex={0} onFocus={() => workbench.selectContent({ kind: "action", id: event.id, text: event.summary, url: event.url })}><p>{event.ok ? "✓" : "!"} {event.summary}</p><details><summary>{relativeTime(event.at)} · details</summary><p>{event.action.replaceAll("_", " ")}</p>{event.url && <a href={event.url} target="_blank" rel="noreferrer">{host(event.url)} ↗</a>}</details></article>) : <Empty title="No actions yet">Completed actions and their evidence appear here.</Empty>}</div>}
     {section === "settings" && <>
       <Toggle label="Screenshots" description="Chrome asks before granting capture access." checked={settings.screenshotEnabled} onChange={(value) => value ? setPermission("capture") : edit({ screenshotEnabled: false })} />

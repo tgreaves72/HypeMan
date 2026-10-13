@@ -20,3 +20,4 @@ export * from "./reminder-recurrence";
 export * from "./recall";
 export * from "./backup";
 export * from "./browser-outcomes";
+export * from "./study";

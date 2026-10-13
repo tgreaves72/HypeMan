@@ -94,12 +94,14 @@ try {
   const extension = resolve("apps/extension/dist");
   context = await chromium.launchPersistentContext(profile, {
     channel: "chromium", headless: true, viewport: { width: 1540, height: 1100 }, acceptDownloads: true,
+    ...(process.env.HYPEMAN_TEST_CHROMIUM ? { executablePath: process.env.HYPEMAN_TEST_CHROMIUM } : {}),
     args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`, "--enable-unsafe-extension-debugging"],
   });
   await installBrowserFixtures(context);
   const worker = context.serviceWorkers()[0] ?? await context.waitForEvent("serviceworker");
   const extensionId = new URL(worker.url()).host;
   home = await context.newPage(); await home.goto(`chrome-extension://${extensionId}/newtab.html`);
+  await home.getByRole("button", { name: "Open HypeMan", exact: true }).waitFor();
   assert.equal(await home.locator(".conversation-workbench").count(), 0);
   assert.equal(await home.getByRole("button", { name: "Open HypeMan", exact: true }).count(), 1);
   await home.screenshot({ path: "tests/screenshots/hypeman-quiet-rooftop.png", fullPage: true });
@@ -195,7 +197,7 @@ try {
   await waitFor(async () => (await rpc({ type: "workspace.get" })).notes.find((value) => value.id === note.id)?.text === "Equal-sized fraction parts can be combined.", "direct note autosave");
   assert.ok(await home.locator(".inline-toolbox-notes button").count() > 0, "Notes keep compact direct controls");
   await send("find my notes about nonexistent-phrase");
-  await home.locator(".workspace-notes").getByText("No matches", { exact: true }).waitFor();
+  await home.locator(".workspace-notes").getByText("No matching sources", { exact: true }).waitFor();
   await send("open projects");
   assert.equal(await home.locator(".workspace-notes:visible").count(), 1);
   await send("find my notes about fraction");

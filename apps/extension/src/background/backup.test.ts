@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { BACKUP_CHUNK_BYTES, WorkspaceHost, backupManifest, emptyLearningGraph, emptyWorkspace, parseWorkspaceBackup, type BackupTransfer, type WorkspaceBackup, type LearningGraph } from "@core";
+import { BACKUP_CHUNK_BYTES, WorkspaceHost, backupManifest, emptyLearningGraph, emptyWorkspace, emptyStudy, parseWorkspaceBackup, type BackupTransfer, type WorkspaceBackup, type LearningGraph, type StudyState } from "@core";
 import { BackupService } from "./backup";
+import { StudyService } from "./study";
 import type { DocumentRepository, StoredDocument } from "./documents";
 const bytes = new TextEncoder().encode("%PDF-1.7\noriginal bytes retained\n%%EOF");
-function fixture(populated = true) {
+function fixture(populated = true, withStudy = false) {
+  let studyState: StudyState = emptyStudy();
   let workspace = emptyWorkspace(), learning: LearningGraph = emptyLearningGraph();
   let workbench: WorkspaceBackup["workbench"] = { version: 1, conversations: [], artifacts: [] };
   const documents: StoredDocument[] = [];
@@ -16,13 +18,15 @@ function fixture(populated = true) {
   }
   const host = new WorkspaceHost({ load: async () => workspace, save: async value => { workspace = value; } });
   const writes = vi.fn();
+  if (withStudy && populated) studyState = { version: 1, cards: [{ id: "card", prompt: "Explain the evidence.", answer: "Original evidence", subject: "Research", source: { kind: "note", id: "note", title: "Saved analysis", url: "", conversationId: "chat", documentId: "pdf", page: 1, capturedAt: 2 }, createdAt: 2, updatedAt: 3, revision: 1, dueAt: 86400003, intervalDays: 1, repetitions: 1, lapses: 0, paused: false }], assignments: [{ kind: "note", id: "note", subject: "Research" }], reviews: [{ id: "review", cardId: "card", at: 3, dueAt: 86400003, grade: "good" }] };
+  const study = new StudyService({ load: async () => studyState, save: async value => { writes(); studyState = value; }, notes: async () => (await host.snapshot()).notes, conversations: async () => workbench.conversations, now: () => 100 });
   const service = new BackupService({ workspace: () => host.snapshot(), restoreWorkspace: async value => { writes(); return host.restore(value); }, learning: async () => learning, restoreLearning: async value => { writes(); const added = value.plans.filter(plan => !learning.plans.some(item => item.id === plan.id)); learning.plans.push(...added); return added.length; },
     workbench: async message => {
       if (message.type === "workbench.export") return structuredClone(workbench);
       writes(); const incoming = message.value as WorkspaceBackup["workbench"], conversations = incoming.conversations.filter(item => !workbench.conversations.some(saved => saved.id === item.id)), artifacts = incoming.artifacts.filter(item => !workbench.artifacts.some(saved => saved.key === item.key));
       workbench.conversations.push(...conversations); workbench.artifacts.push(...artifacts); return { conversations: conversations.length, artifacts: artifacts.length };
-    }, documents: { all: async () => documents, merge: async (incoming: StoredDocument[]) => { writes(); const added = incoming.filter(item => !documents.some(saved => saved.id === item.id)); documents.push(...added); return added.length; } } as unknown as DocumentRepository, now: () => 100 });
-  return { service, host, documents, writes, get workbench() { return workbench; }, get learning() { return learning; } };
+    }, documents: { all: async () => documents, merge: async (incoming: StoredDocument[]) => { writes(); const added = incoming.filter(item => !documents.some(saved => saved.id === item.id)); documents.push(...added); return added.length; } } as unknown as DocumentRepository, ...(withStudy ? { study: () => study.snapshot(), restoreStudy: (value: StudyState) => study.merge(value), preflightStudy: (value: StudyState) => study.preflightMerge(value) } : {}), now: () => 100 });
+  return { service, host, documents, writes, study, get workbench() { return workbench; }, get learning() { return learning; } };
 }
 async function archive(service: BackupService): Promise<{ backup: WorkspaceBackup; text: string }> {
   const transfer = await service.handle({ type: "backup.export" }, "owner") as BackupTransfer, chunks: string[] = [];
@@ -40,6 +44,22 @@ async function upload(service: BackupService, text: string) {
   return transfer.transferId;
 }
 describe("complete local workspace backup", () => {
+  it("roundtrips review schedules, ratings, topics and citations without duplicate cards", async () => {
+    const source = fixture(true, true), target = fixture(false, true), { backup, text } = await archive(source.service);
+    expect(backupManifest(backup).counts.cards).toBe(1);
+    const transferId = await upload(target.service, text);
+    expect(await target.service.handle({ type: "backup.restore.complete", transferId }, "owner")).toMatchObject({ restored: { cards: 1 }, skipped: 0 });
+    expect(await target.study.snapshot()).toEqual(await source.study.snapshot());
+    const retry = await upload(target.service, text);
+    expect(await target.service.handle({ type: "backup.restore.complete", transferId: retry }, "owner")).toMatchObject({ restored: { cards: 0 }, skipped: 7 });
+  });
+  it("rejects an invalid study archive before changing any store", async () => {
+    const source = fixture(true, true), target = fixture(false, true), { backup } = await archive(source.service);
+    backup.study!.cards[0].source.url = "javascript:alert(1)";
+    const transferId = await upload(target.service, JSON.stringify(backup));
+    await expect(target.service.handle({ type: "backup.restore.complete", transferId }, "owner")).rejects.toThrow("Existing work was preserved");
+    expect(target.writes).not.toHaveBeenCalled();
+  });
   it("roundtrips conversations, artifacts, plans and original PDF bytes; deduplicates repeated restore", async () => {
     const source = fixture(), target = fixture(false), { backup, text } = await archive(source.service);
     expect(backupManifest(backup).counts).toEqual({ notes: 1, tasks: 1, conversations: 1, artifacts: 1, plans: 1, documents: 1 });
