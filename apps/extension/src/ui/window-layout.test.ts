@@ -13,7 +13,7 @@ describe("floating tool window geometry", () => {
   });
   it("opens left of chat when there is space and otherwise centers a bounded window", () => {
     const beside = initialWindow("notes", viewport, { left: 1070 });
-    expect(beside).toEqual({ x: 552, y: 170, width: 500, height: 560 });
+    expect(beside).toEqual({ x: 492, y: 100, width: 560, height: 700 });
     const centered = initialWindow("board", viewport, { left: 340 });
     expect(centered).toEqual({ x: 290, y: 130, width: 860, height: 640 });
     const another = initialWindow("notes", viewport, { left: 1070 }, 1); expect(another.x).toBe(beside.x - 22); expect(another.y).toBe(beside.y + 22);
